@@ -1,21 +1,16 @@
 # Flix
 
-* Register/Login Screen
-    * (Create/POST) Create a new user account
-        * ```swift
-        
-            let user = PFUser()
-            user.username = usernameField.text
-            user.password = passwordField.text
+* ```swift
 
-            user.signUpInBackground {(success, error) in
-                if success {
-                    self.performSegue(withIdentifier: "loginSegue", sender: nil)
-                } else {
-                    print("Error: \(error?.localizedDescription)")
-                }
-            }
-        ```
+    let query = PFQuery(className: Weight)
+    query.whereKey("userID", equalTo: currentUser)
+    query.findObjectsInBackground {(weight: [PFObject]?, error: Error?) in
+        if let error = error {
+            print(error.localizedDescription)
+        } else if let weight = weight{
+            // TODO: Do something with weight, may just store in variable
+        }
+    ```
 
 Flix is an app that allows users to browse movies from the [The Movie Database API](http://docs.themoviedb.apiary.io/#).
 
