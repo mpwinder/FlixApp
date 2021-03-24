@@ -1,7 +1,5 @@
 # Flix
 
-* Register/Login Screen
-    * (Create/POST) Create a new user account
 
 Flix is an app that allows users to browse movies from the [The Movie Database API](http://docs.themoviedb.apiary.io/#).
 
