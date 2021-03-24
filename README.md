@@ -3,16 +3,15 @@
 * Summary screen
   * (Read/GET) Current weight of user
   ```swift
-
-    let query = PFQuery(className: Weight)
-    query.whereKey("userID", equalTo: currentUser)
-    query.findObjectsInBackground {(weight: [PFObject]?, error: Error?) in
-        if let error = error {
-            print(error.localizedDescription)
-        } else if let weight = weight{
-            // TODO: Do something with weight, may just store in variable
-        }
-   ```
+     let query = PFQuery(className: Weight)
+     query.whereKey("userID", equalTo: currentUser)
+     query.findObjectsInBackground {(weight: [PFObject]?, error: Error?) in
+         if let error = error {
+             print(error.localizedDescription)
+         } else if let weight = weight{
+             // TODO: Do something with weight, may just store in variable
+         }
+  ```
   * (Read/GET) Most recent distance ran
 
 Flix is an app that allows users to browse movies from the [The Movie Database API](http://docs.themoviedb.apiary.io/#).
