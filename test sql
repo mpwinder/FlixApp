@@ -1,0 +1,172 @@
+/* ========================
+   Author:      Michael Winder
+   Create date: January 11, 2022
+   Description: This collection of SQL code is used to solve a
+                problem for a DVD rental company. The problem is
+                how to determine how many copies of newly released
+                films to purchase for customers to rent. Purchasing
+                too many copies of an unpopular film, and
+                purchasing too few copies of a popular film are
+                undesirable outcomes. Therefore, we can use SQL
+                and data analytics to better predict the number of
+                films to purchase to maximize profit.
+*/
+
+-- B. CREATE detailed table
+DROP IF TABLE EXISTS detailed;
+CREATE TABLE detailed (
+  film_id      integer,
+  title        varchar(255),
+  release_year integer,
+  rating       mpaa_rating,
+  length       smallint,
+  inventory_id integer,
+  store_id     smallint,
+  rental_id    integer,
+  rental_date  timestamp without time zone
+);
+  
+-- View empty detailed table
+SELECT * FROM detailed;
+
+-- CREATE summary table
+DROP TABLE IF EXISTS summary;
+CREATE TABLE summary (
+  rating            mpaa_rating,
+  length_category   varchar(15),
+  number_of_rentals integer
+);
+
+-- View empty summary table
+SELECT * FROM summary;
+
+-- Extract data from dvdrental database and into the detailed table
+INSERT INTO detailed (
+  film_id,
+  title,
+  release_year,
+  rating,
+  length,
+  inventory_id,
+  store_id,
+  rental_id,
+  rental_date)
+SELECT f.film_id,
+	   f.title,
+	   f.release_year,
+	   f.rating,
+	   f.length,
+	   i.inventory_id,
+	   i.store_id,
+	   r.rental_id,
+	   r.rental_date
+FROM film f
+INNER JOIN inventory i ON f.film_id = i.film_id
+INNER JOIN rental r ON i.inventory_id = r.inventory_id
+;
+
+-- View content of the populated detailed table
+SELECT * FROM detailed;
+
+-- Determine average and standard deviation of all film lengths in
+-- data set. Use those stats to determine buckets for film length
+SELECT ROUND(AVG(length)) AS average_length,
+       ROUND(STDDEV(length)) AS standard_deviation,
+FROM film
+;
+
+/* 'Short' category range is from 0 minutes to one standard
+   deviation below the mean, i.e. 0 - 75
+   'Medium' category range is from one standard deviation below the
+   mean to one standard deviation above the mean, i.e. 75 - 155
+   'Long' category range is from one standard deviation above the
+   mean and upward, i.e. 155 - infinity
+*/
+/* D. CREATE FUNCTION
+   Description: This function first truncates the summary table.
+                Then, it selects and inserts the summary data. This
+                includes categorizing the film lengths into three
+                buckets, which were previously outlined in the
+                comment above. Finally, it returns a new trigger.
+*/
+CREATE FUNCTION summary_length_rating_rentals()
+RETURNS TRIGGER AS $$
+BEGIN
+TRUNCATE TABLE summary;
+INSERT INTO summary (
+  SELECT f.rating,
+         CASE
+		   WHEN f.length > 0
+		     AND f.length <= 75 THEN 'Short'
+		   WHEN f.length > 75
+			 AND f.length <= 155 THEN 'Medium'
+		   WHEN f.length > 155 THEN 'Long'
+		   END AS length_category,
+		 COUNT(DISTINCT r.rental_id) AS number_of_rentals
+  FROM film f
+  INNER JOIN inventory i ON f.film_id = i.film_id
+  INNER JOIN rental r ON i.inventory_id = r.inventory_id
+  GROUP BY f.rating, length_category
+  ORDER BY number_of_rentals DESC);
+RETURN NEW;
+END; $$ LANGUAGE PLPGSQL
+;
+
+/* E. CREATE TRIGGER
+   Description: This trigger executes the function
+                summary_length_rating_rentals() after a statement
+                performs an insert on the detailed table. Since
+                the procedure truncates the summary table before
+                re-inserting the data, the data is kept clean and
+                fresh.
+*/
+CREATE TRIGGER summary_refresh
+AFTER INSERT ON detailed
+FOR EACH STATEMENT
+EXECUTE PROCEDURE summary_length_rating_rentals()
+;
+
+/* F. CREATE STORED PROCEDURE
+   Description: This procedure first truncates the detailed table.
+                Then, it repopulates the table with fresh data from
+                the source database. Since this procedure performs
+                an insert on the detailed table, it causes the
+                summary_refresh trigger to execute, which executes
+                the summary_length_rating_rentals function, which
+                truncates and refreshes the summary table.
+                Therefore, the end result of calling this procedure
+                is that both the detailed and summary tables are
+                refreshed.
+*/
+CREATE PROCEDURE refresh_reports()
+LANGUAGE PLPGSQL
+AS $$
+BEGIN
+TRUNCATE TABLE detailed
+INSERT INTO detailed (
+  film_id,
+  title,
+  release_year,
+  rating,
+  length,
+  inventory_id,
+  store_id,
+  rental_id,
+  rental_date)
+SELECT f.film_id,
+       f.title,
+       f.release_year,
+       f.rating,
+       f.length,
+       i.inventory_id,
+       i.store_id,
+       r.rental_id,
+       r.rental_date
+FROM film f
+INNER JOIN inventory i ON f.film_id = i.film_id
+INNER JOIN rental r ON i.rental_id = r.rental_id;
+END; $$
+;
+
+-- Call stored procedure
+CALL refresh_reports();
